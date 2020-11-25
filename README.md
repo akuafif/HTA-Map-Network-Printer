@@ -7,12 +7,11 @@ If the print server is already logged in, you can just use the `Map_Printer.hta`
 ![Map](https://cdn.discordapp.com/attachments/240938506103422976/780824779091476510/unknown.png)
 
 # How is it being done?
-Using [ProcessOutputMonitor](https://github.com/ru-rararu-ra-rurararu-ra/ProcessOutputMonitor) Class.  
-`ProcessOutputMonitor` makes it possible to run multiple command at once.   
-It will spawn a child process and monitor its output.  
+Using [ProcessOutputMonitor](https://github.com/ru-rararu-ra-rurararu-ra/ProcessOutputMonitor) Class. It will spawn a child process and monitor its output.    
+`ProcessOutputMonitor` makes it possible to run multiple commands at once.  
 This will not make HTA GUI hangs and shows not responding in the title bar if the code is running long command.  
 
-`net use` for logging in.    
+`net use` for logging in to server.    
 `net view` for fetching printers from print server. `net view` is way faster than `WMIService.ExecQuery` in vbs.  
 `rundll32 printui.dll,PrintUIEntry` for printer ultilities.
 
