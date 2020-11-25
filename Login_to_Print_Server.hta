@@ -1,0 +1,599 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<HTA:APPLICATION
+APPLICATIONNAME="Login_Print_Server"
+VERSION="0.03"
+MAXIMIZEBUTTON="no"
+MINIMIZEBUTTON="no"
+SINGLEINSTANCE="yes"
+ICON="login.ico"
+SCROLL="no"
+CONTEXTMENU="no"
+BORDER="DIALOG"
+SELECTION="no"/>
+</head>
+<head>
+<title>Login to Print Server</title>
+<style type="text/css">
+.small_desc {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size:0.75em;
+}
+.input_style {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size:0.75em;
+}
+.field_desc {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size:0.75em;
+}
+.title_style{
+	font-family: "Segoe UI";
+	font-size: 1em;
+	font-weight: bold;
+}
+.instructions_style {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size:0.75em;
+}
+.Buttons-style {
+	text-align: right;
+}
+.button_style {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size:0.75em;
+}
+.Footer_Style {
+ 	position: absolute;
+ 	bottom: 0px;
+ 	width: 100%;
+ 	left: 0px;
+}
+</style>
+
+
+
+<SCRIPT LANGUAGE="VBScript">
+On Error Resume Next
+Const DESIGN_WIDTH  = 387		' default popup width in 96 dpi
+Const DESIGN_HEIGHT = 400		' default popup height in 96 dpi
+
+' Hostname (key) : Prefix (Value)
+Dim g_strPrintServerDict : Set g_strPrintServerDict = CreateObject("Scripting.Dictionary") 
+
+' Hostname (key) : Logged in status (Value)
+Dim g_strPrintServerAccessDict : Set g_strPrintServerAccessDict = CreateObject("Scripting.Dictionary") 
+
+' Hostname (key) : Process Object (Value)
+Dim g_strPrintServerProcDict : Set g_strPrintServerProcDict = CreateObject("Scripting.Dictionary") 
+
+' %temp% user directory
+Const TemporaryFolder = 2
+
+' String that hold intranet name network. This is to ensure that the script will only run in intranet network.
+Dim strIntranetDNSSuffix 
+
+
+'---------------------------------------------------------------------------
+' Window_onLoad
+' the main 
+'---------------------------------------------------------------------------
+Sub Window_onLoad		
+	Window.ResizeTo DESIGN_WIDTH, DESIGN_HEIGHT
+	WindowLeft = (Window.screen.availWidth / 2 - DESIGN_WIDTH  /2 )  
+	WindowTop  = (Window.screen.availHeight / 2 - DESIGN_HEIGHT / 2  )
+	Window.moveTo WindowLeft, WindowTop
+	
+	statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt; font-weight:Bold;"">Connecting..</br></font>"
+
+	btnsubmit.Disabled = True
+	
+	LoadConfigurationXMLFile
+	CheckForServerLogin
+End Sub
+
+'---------------------------------------------------------------------------
+' CheckForIntranetNetwork
+' Check for intranet. Will exit() if not connected to intranet network
+'---------------------------------------------------------------------------
+Sub CheckForIntranetNetwork
+	Dim allNetwordCards, objNetworkCard, objWMIService, intranetMatch
+	intranetMatch = False
+	
+	Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2") 
+	Set colNetCards = objWMIService.ExecQuery ("Select DNSDomain From Win32_NetworkAdapterConfiguration Where IPEnabled = True") 
+	
+	i = 0
+	For Each objNetCard in colNetCards
+		i = i + 1
+		if instr(1,objNetCard.DNSDomain,strIntranetDNSSuffix,vbTextCompare) Then
+			intranetMatch = True
+			exit for
+		end if
+	next
+		
+	if intranetMatch = False or i = 0 then
+		statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt;"">Not connected to " & LCase(strIntranetDNSSuffix) & " intranet</font>"
+		MsgBox "No access to " & LCase(strIntranetDNSSuffix) & " intranet." & vbNewLine & vbNewLine & "Please check your connection and try again.", vbCritical,"No Intranet Network Detected"
+		self.close()
+	else
+		statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt;"">Connected to " & LCase(strIntranetDNSSuffix) & " intranet.</br>Checking for active sessions...</font>"
+	End If
+End Sub
+
+'---------------------------------------------------------------------------
+' LoadConfigurationXMLFile
+' load config.xml for server and prefix 
+'---------------------------------------------------------------------------
+Sub LoadConfigurationXMLFile
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	curDir = objShell.CurrentDirectory
+	mapPrinterDir = curDir&"\Map Printer Config"
+	
+		If (fso.FileExists(mapPrinterDir & "\config.xml")) Then
+			Dim ObjXML : Set ObjXML = CreateObject ("Microsoft.XMLDOM") 
+			Dim fileinput, Root, NodeList, Msg, xmlHostname, xmlPrefix, fullpath 
+
+			ObjXML.async = False  
+			ObjXML.load(mapPrinterDir & "\config.xml")  
+			Set Root = ObjXML.documentElement   
+			Set NodeList = ObjXML.selectNodes("/CONFIGURATION/SERVER") 
+			strIntranetDNSSuffix = ObjXML.selectNodes("/CONFIGURATION/INTRANETDNSSUFFIX")(0).Text
+			On Error Resume Next
+			For Each Elem In NodeList   
+				Set xmlHostname = Elem.getElementsByTagName ("HOSTNAME") (0)  
+				Set xmlPrefix= Elem.getElementsByTagName ("PREFIX") (0) 
+				if Len(xmlHostname.Text) = 0 Then
+					corruptAnswer = vbYes
+					Exit For
+				Else
+					g_strPrintServerDict.Add xmlHostname.Text, xmlPrefix.Text  
+				End If
+			Next
+			
+			username.value = "Domain\username"
+			password.focus
+			self.setTimeout "CheckForIntranetNetwork", .5
+		Else
+			corruptAnswer = vbYes
+		End If	
+		
+		If corruptAnswer = vbYes Then
+			CreateConfigFile
+			LoadConfigurationXMLFile
+		End If
+End Sub
+
+'---------------------------------------------------------------------------
+' CreateConfigFile
+' create config.xml for server and prefix if missing or corrupted
+'---------------------------------------------------------------------------
+Sub CreateConfigFile
+	dim outFile, configFileStream, sxml
+	set fso=createobject("scripting.filesystemobject")
+	curDir = objShell.CurrentDirectory
+	mapPrinterDir = curDir&"\Map Printer Config"
+	
+	If Not fso.FolderExists(mapPrinterDir) Then
+		fso.CreateFolder(curDir & "\Map Printer Config")
+	end if
+	
+	
+	outFile= mapPrinterDir & "\config.xml"
+
+	sxml="<?xml version=""1.0"" encoding=""UTF-8"" ?>" & vbcrlf
+	sxml=sxml & "<CONFIGURATION>" & vbcrlf
+	sxml=sxml & vbtab & gensimpletype("INTRANETDNSSUFFIX","Domain.com") & vbcrlf
+	sxml=sxml & vbtab & "<SERVER>" & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("HOSTNAME","Print Server 1") & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Print Prefix") & vbcrlf	
+	sxml=sxml & vbtab & "</SERVER>" & vbcrlf
+	sxml=sxml & vbtab & "<SERVER>" & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("HOSTNAME","Print Server 2") & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Print Prefix") & vbcrlf	
+	sxml=sxml & vbtab & "</SERVER>" & vbcrlf
+	sxml=sxml & vbtab & "<SERVER>" & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("HOSTNAME","Print Server 3") & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Print Prefix") & vbcrlf
+	sxml=sxml & vbtab & "</SERVER>" & vbcrlf
+	sxml=sxml & "</CONFIGURATION>"
+	
+	set configFileStream=fso.opentextfile(mapPrinterDir & "\config.xml",2,true,-2)
+	configFileStream.write sxml
+	configFileStream.close
+	set configFileStream=nothing
+End Sub
+
+function gensimpletype(stag,stext)
+    gensimpletype="<" & stag & ">" & stext & "</" & stag & ">"
+end function
+
+'---------------------------------------------------------------------------
+' QuitScript
+'
+' When the user presses the Quit button, the file where we've
+' been storing the scripts gets deleted and the main window
+' closes.
+'---------------------------------------------------------------------------
+Sub QuitScript
+	self.Close()
+End Sub
+
+'---------------------------------------------------------------------------
+' netUseProcess
+' create a new process with net use command to see what is connected
+'---------------------------------------------------------------------------
+Dim netUseProcess
+Sub CheckForServerLogin
+	Set netUseProcess = New ProcessOutputMonitor
+		netUseProcess.Start "net use "	
+		
+	for each printserver in g_strPrintServerDict.keys
+		g_strPrintServerAccessDict.Add printserver, false
+	next
+	
+	timerID = window.setInterval(GetRef("monitorNetUse"), 100)
+End Sub
+
+'---------------------------------------------------------------------------
+' monitorNetUse
+' to read and monitor the output of the net use command
+' g_strPrintServerAccessDict (key=printserver) : (value=boolean for logged in)
+' 
+' True = Logged in
+' False = Not logged in / Access Denied
+'---------------------------------------------------------------------------
+allLoggedIn = True
+serverNotLoggedIn = ""
+Dim timerID
+Sub monitorNetUse
+	Dim buffer, keepRunning
+	keepRunning = False
+
+	buffer = netUseProcess.NextLine
+	If Not IsEmpty( buffer ) Then 
+		keepRunning = True
+		for each printserver in g_strPrintServerAccessDict.keys
+			'MsgBox buffer
+			if InStr(1, buffer,printserver, VBTextCompare) then
+				g_strPrintServerAccessDict(printserver) = true
+			end if
+		Next
+	Else 
+		keepRunning = CBool( keepRunning Or netUseProcess.IsRunning )
+	End If 
+
+
+	If Not keepRunning Then 
+		window.clearInterval( timerID )
+		timerID = Empty
+		promptForMapping
+		btnsubmit.Disabled = False
+	End If 
+End Sub
+
+sub promptForMapping
+	serverNotLoggedIn = ""
+	allLoggedIn = True
+	for each printserver in g_strPrintServerAccessDict.keys
+		if g_strPrintServerAccessDict(printserver) = false then
+			allLoggedIn = false
+			serverNotLoggedIn = serverNotLoggedIn & " " & printserver
+		End if
+	Next
+		
+	if allLoggedIn = True then
+			answer = MsgBox("You are logged in to all the servers." & vbNewLine & "Do you want to map printer now?",vbQuestion + vbYesNo + vbDefaultButton2, "Logged In")	
+			if answer = vbYes then
+				Set fso = CreateObject("Scripting.FileSystemObject")			
+				If (fso.FileExists("Map Printer.hta")) Then
+					objShell.Run("Map Printer.hta")
+				end if
+			end if
+			window.close()
+		else
+			statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt; font-weight:Bold;"">Not logged in:</br>" & serverNotLoggedIn & "</font>"
+	End if
+	
+	If fromBtnSubmit = True then
+		MsgBox "Login failed" & vbNewLine & "Please check your username and password.", vbCritical,"Login failed"
+		Document.Body.Style.Cursor = "default"
+		btnsubmit.Disabled = False
+		fromBtnSubmit = False
+	end if
+end sub
+
+
+' --------------------------------------------------------------------
+' loginPrinter
+' On button press, Capture user name and password and login for them	
+' --------------------------------------------------------------------
+btnLoginPressed = False
+Sub loginPrinter
+	btnLoginPressed = true
+	Const vbCritical = 16
+	Const vbExclamation = 48
+	Dim strAttrb, strScriptName, intWindowStyle, blnLoginSuccess, sLine
+	blnLoginSuccess = True
+	Document.Body.Style.Cursor = "wait"
+	btnsubmit.Disabled = True
+	statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt; font-weight:Bold;"">Logging in..</br></font>"
+	
+	If Len(username.Value) = 0 or Len(password.Value) = 0 Then
+		MsgBox  "One or more fields are empty.", vbExclamation, "Login Print Server"
+		Document.Body.Style.Cursor = "default"
+		username.focus
+		statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt; font-weight:Bold;"">One or more fields are empty.</br></font>"
+		btnsubmit.Disabled = False
+		Exit Sub
+	End If    
+	
+	If InStr(username.Value, "\") < 0 Then
+		MsgBox "Please enter your user name in this format (DOMAIN\USERNAME)", vbExclamation, "Login Print Server - Attention"
+		username.value = ""
+		password.value = ""
+		username.focus
+		Document.Body.Style.Cursor = "default"
+		statusbox.InnerHTML = "<font color=""darkred"" style=""font-size:8pt; font-weight:Bold;"">Incorrect username format.</br></font>"
+		btnsubmit.Disabled = False
+	    Exit Sub	 
+	End If
+	
+	On Error Resume Next
+	Set netUseProcess = New ProcessOutputMonitor
+		netUseProcess.Start "net use "	
+		
+	for each printserver in g_strPrintServerAccessDict.keys
+		if g_strPrintServerAccessDict(printserver) = false then
+			g_strPrintServerProcDict.Add printserver, New ProcessOutputMonitor
+			g_strPrintServerProcDict(printserver).Start "net.exe use \\\\"  & chr(34) & printserver & chr(34) & " " & password.value & " /USER:" & username.value
+		End if
+	Next
+	
+	fromBtnSubmit = True
+	timerID = self.setInterval(GetRef("monitorLoginProccess"), 100)
+	
+
+End Sub
+
+fromBtnSubmit = False
+Sub monitorLoginProccess
+	Dim buffer, keepRunning
+    keepRunning = False
+
+	
+	For Each printserver in g_strPrintServerProcDict.keys
+		buffer = g_strPrintServerProcDict(printserver).NextLine
+		If Not IsEmpty( buffer ) Then 
+			if Instr(buffer,"successfully") Then
+				g_strPrintServerAccessDict(printserver) = True
+			End If
+			keepRunning = True	
+		Else 
+			keepRunning = CBool( keepRunning Or g_strPrintServerProcDict(printserver).IsRunning )
+		End If 
+	Next
+	
+	If Not keepRunning Then 
+        window.clearInterval( timerID )
+        timerID = Empty
+		promptForMapping
+    End If 
+End Sub
+
+</SCRIPT>
+
+
+
+<body style="background-color: #FFFFFF;margin:0;" onload="zoom()">
+
+<table cellspacing="0" cellpadding="0" border="0">
+<tr>
+		<td style="width: 10px">&nbsp;</td>
+		<td>&nbsp;</td>
+		<td style="width: 10px">&nbsp;</td>
+</tr>
+<tr>
+		<td style="width: 10px">&nbsp;</td>
+		<td>
+			<p class="title_style">Login to Print Server</p>
+			<p class="instructions_style">Your user name and password are required to continue.</p>			
+			<table cellpadding="3" cellspacing="3">
+				<tr>
+					<td class="field_desc"><strong>User Name</strong></td>
+				</tr>
+				<tr>
+					<td>
+					<input class="input_style" ID="username" onFocus="Javascript:this.select()" style="border-style: inset; width: 248px" type="text" /><br />
+					<span class="small_desc"><em>e.g. (<span id=defDomain>Domain</span>\username)</em></span></td>
+				</tr>
+				<tr>
+					<td><strong class="field_desc">Password</strong></td>
+				</tr>
+				<tr>
+					<td>
+					<input id="password" type="password" onFocus="Javascript:this.select()" style="border-style: inset; width: 248px" type="text" class="input_style" /></td>
+				</tr>
+			</table>
+		
+		
+		
+		</td>
+		<td style="width: 10px">&nbsp;</td>
+</tr>
+<tr>
+		<td style="width: 10px">&nbsp;</td>
+		<td>&nbsp;</td>
+		<td style="width: 10px">&nbsp;</td>
+</tr>
+</table>
+
+
+<div class="Footer_Style">
+<table style="width: 100%;" cellspacing="0" cellpadding="0" border="0">
+<tr>
+		<td style="width: 10px">&nbsp;</td>
+		<td style="text-align:left" colspan="2">
+			<span id="statusbox"></span>
+		</td>
+		<td style="height: 40px;" class="Buttons-style" colspan="2">
+			<input class="button_style" id="btnsubmit" type="submit" value="Continue" onclick="loginPrinter" />&nbsp;&nbsp;&nbsp;
+		</td>
+	</tr>
+	
+</table>
+</div>
+
+</div>
+<SCRIPT LANGUAGE="VBScript">
+Dim objShell, objOutput, objExec
+Set objShell = CreateObject("WScript.Shell")
+
+Class ProcessOutputMonitor
+    Dim shell, fso, wmi
+    Dim processID, retCode, processQuery
+    Dim outputFile, inputFile
+
+    Private Sub Class_Initialize
+        Set fso     = CreateObject("Scripting.FileSystemObject")
+        Set shell   = CreateObject("WScript.Shell")
+        Set wmi     = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+        Set inputFile = Nothing 
+    End Sub
+
+    Private Sub Class_Terminate
+        freeResources
+    End Sub
+
+    Public Default Function Start( ByVal commandLine )
+    Const SW_HIDE = 0
+    Const SW_NORMAL = 1
+    Const TemporaryFolder = 2
+    Dim startUp
+
+        Start = False
+        If Not IsEmpty( processID ) Then Exit Function
+
+        outputFile  = fso.BuildPath( _
+            fso.GetSpecialFolder(TemporaryFolder) _ 
+            , Left(CreateObject("Scriptlet.TypeLib").GUID,38) & ".tmp" _ 
+        )
+
+        ' "%comspec%" /c">"outputFile" command arguments "
+        commandLine = Join( _ 
+            Array( _ 
+                quote(shell.ExpandEnvironmentStrings("%comspec%")) _ 
+                , "/c"">" & quote(outputFile) _ 
+                , commandLine _ 
+                , """" _ 
+            ) _ 
+            , " " _ 
+        )
+
+        ' https://msdn.microsoft.com/en-us/library/aa394375%28v=vs.85%29.aspx
+        Set startUp = wmi.Get("Win32_ProcessStartup").SpawnInstance_
+        startUp.ShowWindow = SW_HIDE
+
+        retCode = wmi.Get("Win32_Process").Create( commandLine , Null, startUp, processID )
+        If retCode <> 0 Then
+            freeResources
+            Exit Function 
+        End If 
+
+        processQuery = "SELECT ProcessID From Win32_Process WHERE ProcessID=" & processID 
+
+
+        Start = True
+    End Function 
+
+    Public Property Get StartReturnCode
+        StartReturnCode = retCode
+    End Property 
+
+    Public Property Get WasStarted
+    End Property 
+
+    Public Property Get PID
+        PID = processID
+    End Property 
+
+    Public Property Get IsRunning()
+        IsRunning = False 
+        If Not IsEmpty( processID ) Then 
+            If getWMIProcess() Is Nothing Then 
+                processID = Empty
+                freeResources
+            Else 
+                IsRunning = True
+            End If 
+        End If 
+    End Property 
+
+    Public Property Get NextLine
+        NextLine = getFromInputFile("line")
+    End Property 
+
+    Public Property Get NextData
+        NextData = getFromInputFile("all")
+    End Property
+
+    Private Function getFromInputFile( what )
+    Const ForReading = 1
+        getFromInputFile = Empty
+        If Not IsEmpty( processID ) Then 
+            If inputFile Is Nothing Then 
+                If fso.FileExists( outputFile ) Then 
+                    Set inputFile = fso.GetFile( outputFile ).OpenAsTextStream( ForReading )
+                End If 
+            End If 
+            If Not ( inputFile Is Nothing ) Then 
+                If Not inputFile.AtEndOfStream Then 
+                    Select Case what
+                        Case "line" :   getFromInputFile = inputFile.ReadLine()
+                        Case "all"  :   getFromInputFile = inputFile.ReadAll()
+                    End Select
+                End If 
+            End If 
+        End If 
+    End Function 
+
+    Private Function quote( text )
+        quote = """" & text & """"
+    End Function 
+
+    Private Function getWMIProcess()
+    Const wbemFlagForwardOnly = 32
+    Dim process
+        Set getWMIProcess = Nothing
+        If Not IsEmpty( processID ) Then 
+            For Each process In wmi.ExecQuery( processQuery, "WQL", wbemFlagForwardOnly )
+                Set getWMIProcess = process
+            Next 
+        End If 
+    End Function 
+
+    Private Sub freeResources()
+    Dim process
+        Set process = getWMIProcess()
+        If Not ( process Is Nothing ) Then 
+            process.Terminate
+        End If 
+        processID = Empty
+        processQuery = Empty
+        If Not ( inputFile Is Nothing ) Then 
+            inputFile.Close
+            Set inputFile = Nothing 
+            fso.DeleteFile outputFile 
+        End If 
+    End Sub
+
+End Class
+</SCRIPT>
+
+<script type="text/javascript">
+        function zoom() {
+            document.body.style.zoom = "133%" 
+        }
+</script>
+</body>
+</html>

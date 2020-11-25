@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CONFIGURATION>
+	<INTRANETDNSSUFFIX>domain.com</INTRANETDNSSUFFIX>
+	<SERVER>
+		<HOSTNAME>Print Server 1</HOSTNAME>
+		<PREFIX>Printer Prefix 1</PREFIX>
+	</SERVER>
+	<SERVER>
+		<HOSTNAME>Print Server 2</HOSTNAME>
+		<PREFIX>Printer Prefix 2 </PREFIX>
+	</SERVER>
+	<SERVER>
+		<HOSTNAME>Print Server 3</HOSTNAME>
+		<PREFIX>Printer Prefix 3</PREFIX>
+	</SERVER>
+</CONFIGURATION>
