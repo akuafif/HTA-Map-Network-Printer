@@ -7,7 +7,7 @@
 	</SERVER>
 	<SERVER>
 		<HOSTNAME>Print Server 2</HOSTNAME>
-		<PREFIX>Printer Prefix 2 </PREFIX>
+		<PREFIX>Printer Prefix 2</PREFIX>
 	</SERVER>
 	<SERVER>
 		<HOSTNAME>Print Server 3</HOSTNAME>

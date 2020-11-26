@@ -2,7 +2,6 @@
 ' A script to create shortcut of the file based on the location of
 ' the map printer folder located
 '---------------------------------------------------------------------------
-
 createLoginFile
 createMapFile
 
@@ -19,12 +18,8 @@ Sub createLoginFile
 	link.WindowStyle = 3
 	
 	Set fso = CreateObject("Scripting.FileSystemObject")
-
-	
-	curDir = fso.GetParentFolderName(Wscript.ScriptFullName) 
-
-	If (fso.FileExists(curDir + "\login.ico")) Then
-		link.IconLocation = curDir + "\login.ico,0"
+	If (fso.FileExists(fso.GetParentFolderName(Wscript.ScriptFullName) + "\login.ico")) Then
+		link.IconLocation = fso.GetParentFolderName(Wscript.ScriptFullName) + "\login.ico,0"
 	End If
 
 	link.TargetPath = curDir + "\Login_to_Print_Server.hta"
@@ -46,11 +41,8 @@ Sub createMapFile
 	link.WindowStyle = 3
 	
 	Set fso = CreateObject("Scripting.FileSystemObject")
-
-	curDir = fso.GetParentFolderName(Wscript.ScriptFullName) 
-
-	If (fso.FileExists(curDir + "\map.ico")) Then
-		link.IconLocation = curDir + "\map.ico,0"
+	If (fso.FileExists(fso.GetParentFolderName(Wscript.ScriptFullName) + "\map.ico")) Then
+		link.IconLocation = fso.GetParentFolderName(Wscript.ScriptFullName) + "\map.ico,0"
 	End If
 
 	link.TargetPath = curDir + "\Map_Printer.hta"

@@ -16,66 +16,57 @@ CONTEXTMENU="no"
 <title>Map Printer</title>
 <head>
 <style>
-body
-{
-background-color: buttonface;
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
-font-size: 8pt;
-margin-top: 2px;
-margin-left: 8px;
-margin-right: 3px;
-margin-bottom: 3px;
-filter:progid:DXImageTransform.Microsoft.Gradient(GradientType=1, StartColorStr='#F0F0F0', EndColorStr='#0F0F0F')
+body{
+	background-color: buttonface;
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size: 8pt;
+	margin-top: 2px;
+	margin-left: 8px;
+	margin-right: 3px;
+	margin-bottom: 3px;
+	filter:progid:DXImageTransform.Microsoft.Gradient(GradientType=1, StartColorStr='#F0F0F0', EndColorStr='#0F0F0F')
 }
 
-.button
-{
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
-font-size: 8pt;
-width: 50px;
+.button{
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size: 8pt;
+	width: 50px;
 }
 
-.wmibutton
-{
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
-font-size: 8pt;
-width: 70px;
+.wmibutton{
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size: 8pt;
+	width: 70px;
 }
 
-.bigger_button
-{
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
-font-size: 8pt;
-width: 110px;
+.bigger_button{
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size: 8pt;
+	width: 110px;
 }
 
-textarea
-{
-font-family:'Segoe UI', Tahoma, Geneva, Verdana; 
-font-size: 8pt;
-margin-left: 3px;
-margin-right: 3px;
+textarea{
+	font-family:'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size: 8pt;
+	margin-left: 3px;
+	margin-right: 3px;
 }
 
-select
-{
-font-family:'Segoe UI', Tahoma, Geneva, Verdana; 
-font-size: 8pt;
-margin-left: 0px;
+select{
+	font-family:'Segoe UI', Tahoma, Geneva, Verdana; 
+	font-size: 8pt;
+	margin-left: 0px;
 }
 </style>
 
 
 </head>
-'********************************************************************
-'* BEGIN_SCRIPT
-'********************************************************************
 <script language="vbscript">
-' '---------------------------------------------------------------------------
-'This HTA is based on Journeyman, http://blogs.ittoolbox.com/networking/journey.
-'Able to view/map/remove and set default printer.
-'User need to be login and have access right to the server for the HTA to work.
-' '---------------------------------------------------------------------------
+'---------------------------------------------------------------------------
+' This HTA is based on Journeyman, http://blogs.ittoolbox.com/networking/journey.
+' Able to view/map/remove and set default printer.
+' User need to be login and have access right to the server for the HTA to work.
+'---------------------------------------------------------------------------
 
 '-------------------------
 ' Global State Variables
@@ -89,22 +80,16 @@ Dim g_strPrintServerAccessDict : Set g_strPrintServerAccessDict = CreateObject("
 ' Printer ShareName (key) : Printer Description (Value)
 Dim g_strPrintDescription : Set g_strPrintDescription = CreateObject("Scripting.Dictionary") 
 
-Dim strIntranetDNSSuffix, strPrinterToAdd
-
-' For async login
 ' Hostname (key) :  ProcessOutputMonitor Object (Value) 
 Dim printServerDict : Set printServerDict = CreateObject("Scripting.Dictionary") 
-Dim timerID,strHTML, strPrintersToAdd
 
-' Bool to skip checking g_strPrintServerAccessDict if all logged in
-' True = Logged in
-' False = Not logged in / Access Denied
+Dim strIntranetDNSSuffix, strPrinterToAdd
+Dim timerID, strHTML, strPrintersToAdd
+
+Dim monitorAddPrinter, monitorPrinterProc
+
 allLoggedIn = True
-
-' Total number of avaliable printers
 totalPrinters = 0
-
-
 
 '---------------------------------------------------------------------------
 ' Window_Onload
@@ -113,26 +98,19 @@ totalPrinters = 0
 Sub Window_Onload
 	self.Focus()
 	resizeWindow
-	ButtonDisable True
 	
+	ButtonDisable True
 	PleaseWait.style.visibility = "hidden"
 	
 	LoadConfigurationXMLFile
-	
 	CheckForServerLogin
-	
 End Sub
 
-
-
+'---------------------------------------------------------------------------
+' resizeWindow
+'---------------------------------------------------------------------------
 Sub resizeWindow
-    'The following three constants establish the width and height of the form and
-    'the dots per inch (DPI) in use on the screen that the form was designed on.
-    'If this script is run on a computer with a different DPI setting, then the form
-    'should be sized correctly. 
     const DESIGN_DPI = 96	'dots per inch
-    'const DESIGN_WIDTH  = 437	'pixels
-    'const DESIGH_HEIGHT = 300	'pixels
 	const DESIGN_WIDTH  = 579	'pixels
     const DESIGH_HEIGHT = 425	'pixels
     
@@ -148,19 +126,21 @@ Sub resizeWindow
         pixels_per_logical_inch_width  = item.PixelsPerXLogicalInch
     next
 	
+	' Set size 
     width_pixels  = DESIGN_WIDTH / DESIGN_DPI * pixels_per_logical_inch_width
     height_pixels = DESIGH_HEIGHT / DESIGN_DPI * pixels_per_logical_inch_height
     Window.ResizeTo width_pixels, height_pixels
 	
+	' Spawn middle of the screen
 	WindowLeft = (Window.screen.availWidth / 2 - DESIGN_WIDTH / 2  )  
 	WindowTop  = (Window.screen.availHeight / 2 - DESIGH_HEIGHT / 2  )
 	Window.moveTo WindowLeft, WindowTop
-     'End resize code
 End Sub
 
 '---------------------------------------------------------------------------
 ' CheckForIntranetNetwork
-' Check for intranet network before checking for server access
+'
+' Will self.close() if not connected to intranet
 '---------------------------------------------------------------------------
 Sub CheckForIntranetNetwork
 	Dim allNetwordCards, objNetworkCard, objWMIService, intranetMatch
@@ -189,53 +169,49 @@ End Sub
 
 '---------------------------------------------------------------------------
 ' LoadConfigurationXMLFile
-' load config.xml for server and prefix
 '---------------------------------------------------------------------------
 Sub LoadConfigurationXMLFile
 	Set fso = CreateObject("Scripting.FileSystemObject")
 	curDir = objShell.CurrentDirectory
 	mapPrinterDir = curDir&"\Map Printer Config"
 	
-		If (fso.FileExists(mapPrinterDir & "\config.xml")) Then
-			Dim ObjXML : Set ObjXML = CreateObject ("Microsoft.XMLDOM") 
-			Dim fileinput, Root, NodeList, Msg, xmlHostname, xmlPrefix, fullpath 
-			
-			ObjXML.async = False  
-			ObjXML.load(mapPrinterDir & "\config.xml")  
-			Set Root = ObjXML.documentElement   
-			Set NodeList = ObjXML.selectNodes("/CONFIGURATION/SERVER") 
-			strIntranetDNSSuffix = ObjXML.selectNodes("/CONFIGURATION/INTRANETDNSSUFFIX")(0).Text
-			On Error Resume Next
-			For Each Elem In NodeList   
-				Set xmlHostname = Elem.getElementsByTagName ("HOSTNAME") (0)  
-				Set xmlPrefix= Elem.getElementsByTagName ("PREFIX") (0) 
-				if Len(xmlHostname.Text) = 0 Then
-					'corruptAnswer = MsgBox("Config file Corrupted." & vbNewLine & "Do you want to recreate?",vbQuestion + vbYesNo + vbDefaultButton2, "Corrupt Config File")
-					corruptAnswer = vbYes
-					Exit For
-				Else
-					g_strPrintServerDict.Add xmlHostname.Text, xmlPrefix.Text  
-				End If
-			Next
-			
-			self.setTimeout "CheckForIntranetNetwork", .5
-		Else
-			'corruptAnswer = MsgBox("Config file missing or corrupted." & vbNewLine & "Do you want to recreate?",vbQuestion + vbYesNo + vbDefaultButton2, "Config File missing or corrupted")	
-			corruptAnswer = vbYes
-		End If	
+	If (fso.FileExists(mapPrinterDir & "\config.xml")) Then
+		Dim ObjXML : Set ObjXML = CreateObject ("Microsoft.XMLDOM") 
+		Dim fileinput, Root, NodeList, Msg, xmlHostname, xmlPrefix, fullpath 
 		
-		If corruptAnswer = vbYes Then
-			CreateConfigFile
-			LoadConfigurationXMLFile
-		ElseIf corruptAnswer = vbNo Then
-			MsgBox "The Application will exit"
-			QuitScript
-		End If
+		ObjXML.async = False  
+		ObjXML.load(mapPrinterDir & "\config.xml")  
+		Set Root = ObjXML.documentElement   
+		Set NodeList = ObjXML.selectNodes("/CONFIGURATION/SERVER") 
+		strIntranetDNSSuffix = ObjXML.selectNodes("/CONFIGURATION/INTRANETDNSSUFFIX")(0).Text
+		On Error Resume Next
+		For Each Elem In NodeList   
+			Set xmlHostname = Elem.getElementsByTagName ("HOSTNAME") (0)  
+			Set xmlPrefix= Elem.getElementsByTagName ("PREFIX") (0) 
+			if Len(xmlHostname.Text) = 0 Then
+				corruptAnswer = True
+				Exit For
+			Else
+				g_strPrintServerDict.Add xmlHostname.Text, xmlPrefix.Text  
+			End If
+		Next
+		
+		self.setTimeout "CheckForIntranetNetwork", .5
+	Else	
+		corruptAnswer = True
+	End If	
+	
+	If corruptAnswer Then
+		CreateConfigFile
+		LoadConfigurationXMLFile
+	End If
 End Sub
 
 '---------------------------------------------------------------------------
 ' netUseProcess
-' create a new process with net use command to see what is connected
+'
+' create a new process with net use command 
+' to see what print server is currently connected
 '---------------------------------------------------------------------------
 Dim netUseProcess
 Sub CheckForServerLogin
@@ -256,9 +232,6 @@ End Sub
 ' monitorNetUse
 ' to read and monitor the output of the net use command
 ' g_strPrintServerAccessDict (key=printserver) : (value=boolean for logged in)
-' 
-' True = Logged in
-' False = Not logged in / Access Denied
 '---------------------------------------------------------------------------
 Sub monitorNetUse
 	Dim buffer, keepRunning
@@ -267,7 +240,6 @@ Sub monitorNetUse
 	buffer = netUseProcess.NextLine
 	If Not IsEmpty( buffer ) Then 
 		for each printserver in g_strPrintServerAccessDict.keys
-			'MsgBox buffer
 			if InStr(1, buffer,printserver, VBTextCompare) then
 				g_strPrintServerAccessDict(printserver) = true
 			end if
@@ -315,23 +287,22 @@ Sub CreateConfigFile
 		fso.CreateFolder(curDir & "\Map Printer Config")
 	end if
 	
-	
 	outFile= mapPrinterDir & "\config.xml"
 
 	sxml="<?xml version=""1.0"" encoding=""UTF-8"" ?>" & vbcrlf
 	sxml=sxml & "<CONFIGURATION>" & vbcrlf
-	sxml=sxml & vbtab & gensimpletype("INTRANETDNSSUFFIX","Domain.com") & vbcrlf
+	sxml=sxml & vbtab & gensimpletype("INTRANETDNSSUFFIX","domain.com") & vbcrlf
 	sxml=sxml & vbtab & "<SERVER>" & vbcrlf
 	sxml=sxml & vbtab & vbtab & gensimpletype("HOSTNAME","Print Server 1") & vbcrlf
-	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Print Prefix") & vbcrlf	
+	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Printer Prefix 1") & vbcrlf	
 	sxml=sxml & vbtab & "</SERVER>" & vbcrlf
 	sxml=sxml & vbtab & "<SERVER>" & vbcrlf
 	sxml=sxml & vbtab & vbtab & gensimpletype("HOSTNAME","Print Server 2") & vbcrlf
-	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Print Prefix") & vbcrlf	
+	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Printer Prefix 2") & vbcrlf	
 	sxml=sxml & vbtab & "</SERVER>" & vbcrlf
 	sxml=sxml & vbtab & "<SERVER>" & vbcrlf
 	sxml=sxml & vbtab & vbtab & gensimpletype("HOSTNAME","Print Server 3") & vbcrlf
-	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Print Prefix") & vbcrlf
+	sxml=sxml & vbtab & vbtab & gensimpletype("PREFIX","Printer Prefix 3") & vbcrlf
 	sxml=sxml & vbtab & "</SERVER>" & vbcrlf
 	sxml=sxml & "</CONFIGURATION>"
 	
@@ -341,6 +312,11 @@ Sub CreateConfigFile
 	set configFileStream=nothing
 End Sub
 
+'---------------------------------------------------------------------------
+' gensimpletype
+'
+' For XML node cooking
+'---------------------------------------------------------------------------
 function gensimpletype(stag,stext)
     gensimpletype="<" & stag & ">" & stext & "</" & stag & ">"
 end function
@@ -348,7 +324,7 @@ end function
 '---------------------------------------------------------------------------
 ' BuildPrinterList
 '
-' This is the script that builds the select boxes for current
+' This is the start of building the select boxes for current
 ' network printers and the printers that are on the print server.
 '---------------------------------------------------------------------------
 sub BuildPrinterList
@@ -365,7 +341,6 @@ sub BuildPrinterList
 	for each printserver in g_strPrintServerDict.keys
 		printServerDict.Add printserver, New ProcessOutputMonitor
 		printServerDict(printserver).Start "net view " & printserver ,0
-		'MsgBox "net view " & printserver	
 	next
 	
 	timerID = self.setInterval(GetRef("GetAllPrintersFromPrintServer"), 1)
@@ -380,12 +355,12 @@ end Sub
 '---------------------------------------------------------------------------
 Sub GetAllPrintersFromPrintServer
 	printers_decription.InnerHTML = "<font color=""darkred"" style=""font-size:9pt;"">Connected to " & LCase(strIntranetDNSSuffix) & " intranet. Searching for avaliable network printers...</font>"
+	
 	If allLoggedIn = True Then
 		Dim buffer, keepRunning
 		keepRunning = False
 		
 		For Each printserver in printServerDict.keys
-			'Msgbox "Key: " & printserver & " value: "  & printServerDict(printserver).NextLine
 			buffer = printServerDict(printserver).NextLine
 			
 			If Not IsEmpty( buffer ) Then 
@@ -417,7 +392,6 @@ Sub GetAllPrintersFromPrintServer
 	End If
 end sub
 
-
 '---------------------------------------------------------------------------
 ' QuitScript
 '---------------------------------------------------------------------------
@@ -429,8 +403,7 @@ End Sub
 ' GetPrinters
 '
 ' This adds the network printers already connected to the
-' workstation to the Current Network Printers select box. Once
-' it has completed it enables the buttons that pertain to it.
+' workstation to the Current Network Printers selection box.
 '---------------------------------------------------------------------------
 Sub GetPrinters
 	PleaseWait.InnerHTML = "<font color=""darkred"" style=""font-size:12pt; font-weight: Bold; color: Black;"">Refreshin connected printer list. Please wait.</font>"
@@ -479,9 +452,13 @@ Sub GetPrinters
 		Printers.Add(objOption)
 	Next
 	PleaseWait.InnerHTML = "<font color=""darkred"" style=""font-size:12pt; font-weight: Bold; color: Black;"">Please wait while your request is processed.</font>"
-
 end Sub
 
+'---------------------------------------------------------------------------
+' onChangePrintSelectDropDown
+'
+' Display the description of the printer on change
+'---------------------------------------------------------------------------
 Sub onChangePrintSelectDropDown
 	if AddPrintersSelect.SelectedIndex > 0 Then
 		printers_decription.InnerHTML = "<font color=""darkred"" style=""font-size:9pt;"">Description: " & g_strPrintDescription(AddPrintersSelect.Value) & "</font>"
@@ -490,6 +467,9 @@ Sub onChangePrintSelectDropDown
 	End if
 End Sub
 
+'---------------------------------------------------------------------------
+' ButtonDisable
+'---------------------------------------------------------------------------
 Sub ButtonDisable(Toggle)
 	AddPrinterbutton.Disabled = Toggle
 	RemovePrinterButton.Disabled = Toggle
@@ -502,8 +482,8 @@ End Sub
 '---------------------------------------------------------------------------
 ' ShowWaitScript
 '
-' When the user presses the any button, we check the variable
-' to see we display the please wait block and then run the
+' When the user presses the any button, disable all button and
+' display the please wait block and then run the
 ' appropriate script.
 '---------------------------------------------------------------------------
 Sub ShowWaitScript(ActionToPerform)
@@ -535,7 +515,6 @@ End Sub
 ' textbox to see what Printer is being added and whether it is
 ' being set to the default.
 '---------------------------------------------------------------------------
-Dim monitorAddPrinter, monitorPrinterProc
 Sub AddPrinter
 	if AddPrintersSelect.SelectedIndex = 0 then
 		msgbox "You have to select a printer from list before one can be added.", 48, "Select Printer"
@@ -547,9 +526,7 @@ Sub AddPrinter
 	strPrinterToAdd = AddPrintersSelect.Value
 	i = 0
 	do while i < Printers.Length
-			'MsgBox Printers.Item(i).Value & " " & strPrinterToAdd
 			if InStr(1, strPrinterToAdd,Printers.Item(i).Value, VBTextCompare) then
-				'MsgBox Printers.Item(i).Value & " " & strPrinterToAdd
 				msgbox "The printer is already connected.", 48, "Printer"
 				PleaseWait.style.visibility = "hidden"
 				ButtonDisable False
@@ -564,14 +541,12 @@ Sub AddPrinter
 	monitorAddPrinter.Start "cmd.exe /c rundll32 printui.dll,PrintUIEntry /q /in /n" & strPrinterToAdd , 1
 
 	timerID = self.setInterval(GetRef("monitorAddPrinterProcess"), 100)
-
 End Sub
 
 '---------------------------------------------------------------------------
 ' monitorAddPrinterProcess
 '
 ' To monitor the rundll32 process that adding the network printer
-' It uses the ProcessMonitor class object.
 ' After adding, it will prompt user if the added printer will be 
 ' set to default printer
 '---------------------------------------------------------------------------
@@ -597,7 +572,6 @@ Sub monitorAddPrinterProcess
 		i = 0
 		successAddprint = false
 		do while i < Printers.Length
-			'msgbox "from printer list: " & Printers.Item(i).Value & vbNewLine & "strPrinterToAdd: " &strPrinterToAdd 
 			if InStr(1, strPrinterToAdd,Printers.Item(i).Value, VBTextCompare) then
 				successAddprint = true
 				if (msgbox("Do you want to set this printer as your default?",292, "Set Default")) = 6 then
@@ -609,8 +583,6 @@ Sub monitorAddPrinterProcess
 			end if
 			i = i + 1
 		loop
-		
-
 			
 		if not successAddprint then
 			msgbox "Failed to connect to " & strPrinterToAdd & "." & vbNewLine  & vbNewLine  & "Did you clicked Cancel during installation?" & vbNewLine & "If not,	please make sure you are connected to the print server and your account have access rights to connect to the network printer, " & strPrinterToAdd & ".", 48, "Fail to add " & strPrinterToAdd & "."
@@ -629,10 +601,8 @@ End Sub
 '
 ' To monitor the rundll32 process that running the action for at 
 ' the network printer: 
-'		- test print
 '		- set default
-'
-' It uses the ProcessMonitor class object
+'		- remove single printer
 '---------------------------------------------------------------------------
 Sub monitorPrinterProcess
 	Dim buffer, keepRunning
@@ -655,6 +625,9 @@ Sub monitorPrinterProcess
     End If 
 End Sub
 
+'---------------------------------------------------------------------------
+' TestPrint
+'---------------------------------------------------------------------------
 Sub TestPrint
 	If Printers.SelectedIndex = -1 then
 		msgbox "You have to select a printer to test print.", 48, "Select Printer"
@@ -664,7 +637,7 @@ Sub TestPrint
 		exit sub
 	end if
 	
-	' Check for multiple selection
+	' Check for multiple selection validation
 	i = 0
 	selected = 0
 	do while i < Printers.Length
@@ -695,7 +668,7 @@ End Sub
 ' RemoveScript
 '
 ' When the user presses the Remove Printer(s) button, we check
-' the select box to see what Printer(s) is being removed and
+' the selection box to see what Printer(s) is being removed and
 ' whether it is set to the default. If it is the default, set
 ' another.
 '---------------------------------------------------------------------------
@@ -710,6 +683,7 @@ Sub RemoveScript
 		exit sub
 	end if
 	
+	' No delete of local Microsoft Print to PDF
 	If Printers.Item(Printers.SelectedIndex).Value = "Microsoft Print to PDF" then
 		Msgbox "Unable to delete local printer " & Printers.Item(Printers.SelectedIndex).Text, vbCritical, "Remove Printer"
 		PleaseWait.style.visibility = "hidden"
@@ -717,8 +691,6 @@ Sub RemoveScript
 		Exit Sub
 	end if
 
-	
-	
 	' Check for multiple selection
 	i = 0
 	selected = 0
@@ -729,6 +701,7 @@ Sub RemoveScript
 		i = i + 1
 	loop
 	
+	' Single printer deletion
 	if selected = 1 then
 		PleaseWait.InnerHTML = "<font color=""darkred"" style=""font-size:7pt; color: Black;"">Removing "& vbNewLine  & Printers.Item(Printers.SelectedIndex).Value & "." & vbNewLine &  vbNewLine & "Please wait.</font>"
 		Set monitorPrinterProc = New ProcessOutputMonitor
@@ -737,9 +710,10 @@ Sub RemoveScript
 		Exit Sub
 	end if 
 	
-	' Have to wait for the rundll32 before executing another process to end. So have to use processmonitor class to do it
-	' we use dict to dynamcially create the object class based on the number of selection.
-	' Print share name(key) : Process Object (Value)
+	' Here is the start of calling of  recursive sub "monitorDeleteProccess"
+	' Have to wait for the rundll32 to end before executing another rundll32.
+	' We use dict to create the object class based on the number of selection
+	' Print share name(key) : ProcessOutputMonitor Object (Value)
 	i = 0
 	Set multiRemovalPrinterDic = CreateObject("Scripting.Dictionary")
 	do while i < Printers.Length
@@ -759,15 +733,16 @@ Sub RemoveScript
 	timerID = self.setInterval(GetRef("monitorDeleteProccess"), 400)
 End Sub
 
+'---------------------------------------------------------------------------
+' monitorDeleteProccess
+'---------------------------------------------------------------------------
 Sub monitorDeleteProccess
 	Dim buffer, keepRunning
     keepRunning = False
 
-			
 	PleaseWait.InnerHTML = "<font color=""darkred"" style=""font-size:7pt; color: Black;"">Removing printer: "& vbNewLine & multiRemovalPrinterDic.Keys()(delposition) & "." & vbNewLine &  vbNewLine & "Please wait.</font>"
 
     buffer = multiRemovalPrinterDic.Items()(delposition).NextData
-
     If Not IsEmpty( buffer ) Then 
         keepRunning = True
     Else 
@@ -796,7 +771,7 @@ End Sub
 '
 ' When the user presses the Set as Default button, we check the
 ' select box to see what Printer(s) is being set and make it the
-' default. Then reorganize the list.
+' default. Then reorganize the list with JavaScript function below.
 '---------------------------------------------------------------------------
 sub DefaultPrinterScript
 	If Printers.SelectedIndex = -1 then
@@ -826,7 +801,6 @@ sub DefaultPrinterScript
 	loop
 	
 	' Have to wait for the rundll32 process to setting the printer as default to finish. 
-	' Using ProcessMonitor to monitor it
 	Set monitorPrinterProc = New ProcessOutputMonitor
 	monitorPrinterProc.Start "rundll32 printui.dll,PrintUIEntry /y /n" & chr(34) & Printers.Item(Printers.SelectedIndex).Value & chr(34) , 0
 	timerID = self.setInterval(GetRef("monitorPrinterProcess"), 1500)
@@ -868,6 +842,9 @@ Sub PrinterProperties
 	ButtonDisable False
 End Sub
 
+'---------------------------------------------------------------------------
+' AboutScript
+'---------------------------------------------------------------------------
 Sub AboutScript
 	PleaseWait.style.visibility = "hidden"
 	MsgBox "Map Printer" & vbNewLine & vbNewLine & "By: ru-rararu-ra-rurararu-ra" & vbNewLine & vbNewLine & "For any techincal assitance, please call helpdesk for assistance. Thank you.", vbInformation, "About"
@@ -877,7 +854,6 @@ End Sub
 </script>
 
 <script type="text/vbscript" >
-
 Class ProcessOutputMonitor
     Dim shell, fso, wmi
     Dim processID, retCode, processQuery
@@ -1017,15 +993,12 @@ Class ProcessOutputMonitor
     End Sub
 
 End Class
-
 </script>
 
 
 
 
 <script language="JavaScript" type="text/javascript">
-
-
 /*********************************************************************
 * sortlist(ddlPrinters)
 *
@@ -1036,28 +1009,27 @@ End Class
 * selectbox.
 *********************************************************************/
 function sortList(ddlPrinters) {
+	var selectBox = document.getElementById(ddlPrinters);
 
-var selectBox = document.getElementById(ddlPrinters);
+	selectArray = new Array();
 
-selectArray = new Array();
+	if(selectBox.length < 2)
+	{
+		return;
+	}
 
-if(selectBox.length < 2)
-{
-return;
-}
+	for (i = 1; i < selectBox.length; i++) {
+		selectArray[i] = new Array();
+		selectArray[i][0] = selectBox.options[i].text;
+		selectArray[i][1] = selectBox.options[i].value;
+	}
 
-for (i = 1; i < selectBox.length; i++) {
-selectArray[i] = new Array();
-selectArray[i][0] = selectBox.options[i].text;
-selectArray[i][1] = selectBox.options[i].value;
-}
+	selectArray.sort();
 
-selectArray.sort();
-
-for (j = 0; j < selectBox.length - 1; j++) {
-selectBox.options[j+1].text = selectArray[j][0];
-selectBox.options[j+1].value = selectArray[j][1];
-}
+	for (j = 0; j < selectBox.length - 1; j++) {
+		selectBox.options[j+1].text = selectArray[j][0];
+		selectBox.options[j+1].value = selectArray[j][1];
+	}
 }
 </script>
 
@@ -1065,73 +1037,73 @@ selectBox.options[j+1].value = selectArray[j][1];
 
 <body onload="zoom()">
 <table WIDTH="400" BORDER=1>
-<tr>
-<td VALIGN=TOP WIDTH=700 COLSPAN=2>
-<table BORDER=0>
-<tr>
-<td colspan=3>
-<div style="font-size:8pt;">Add Network Printers</div>
-</td>
-</tr>
-<tr>
-<td WIDTH=400 VALIGN=TOP>
-<span id="add_printers"></span>
-</td>
-<td>
-<input id=AddPrinterbutton class="bigger_button" type="button" value="Add Printer" style="font-weight:bold;" name="add_printer_button" onClick="ShowWaitScript('Add')">
-</td>
-<td>
-<input id=quitbutton class="button" style="background-color: DarkRed; color:White; font-weight:bold;" type="button" value="Quit" name="quit_button" onClick="QuitScript()">
-</td>
-</tr>
-<td colspan=3>
-<span id="printers_decription"></span>
-</td>
-</table>
-</td>
-</tr>
+	<tr>
+		<td VALIGN=TOP WIDTH=700 COLSPAN=2>
+			<table BORDER=0>
+				<tr>
+					<td colspan=3>
+						<div style="font-size:8pt;">Add Network Printers</div>
+					</td>
+				</tr>
+			<tr>
+				<td WIDTH=400 VALIGN=TOP>
+					<span id="add_printers"></span>
+				</td>
+				<td>
+					<input id=AddPrinterbutton class="bigger_button" type="button" value="Add Printer" style="font-weight:bold;" name="add_printer_button" onClick="ShowWaitScript('Add')">
+				</td>
+				<td>
+					<input id=quitbutton class="button" style="background-color: DarkRed; color:White; font-weight:bold;" type="button" value="Quit" name="quit_button" onClick="QuitScript()">
+				</td>
+			</tr>
+			<td colspan=3>
+				<span id="printers_decription"></span>
+			</td>
+			</table>
+		</td>
+	</tr>
 
-<tr>
-<td WIDTH=700>
-<table BORDER=0>
-<tr>
-<td colspan=3>
-<div ID=header style="font-size:8pt;">Network Printers Connected</div>
-</td>
-</tr>
-<tr>
-<td align="top">
-<select id="Printers" name="Printers" multiple="multiple" size="13" style="width: 144px;">
-</select>
-</td>
-<td valign="top">
-<input id=RemovePrinterbutton class="bigger_button" type="button" value="Remove Printer(s)" style="font-weight:bold;" name="remove_printer_button" onClick="ShowWaitScript('Remove')">
-<br />
-<input id=DefaultPrinterbutton class="bigger_button" type="button" value="Set as Default" style="font-weight:bold;" name="set_default_printer_button" onClick="ShowWaitScript('Default')">
-<br />
-<input id=TestPrinterbutton class="bigger_button" type="button" value="Test Print" style="font-weight:bold;" name="set_test_printer_button" onClick="ShowWaitScript('TestPrint')">
-</td>
-<td valign="Top">
-<input id=PrinterPropertiesbutton class="bigger_button" type="button" value="Printer Properties" style="font-weight:bold;" name="printer_properties_button" onClick="ShowWaitScript('Properties')">
-<br /><br />
-<input id=Aboutbutton class="bigger_button" type="button" value="About" style="font-weight:bold;" name="About_button" onClick="ShowWaitScript('AboutScript')">
-<br />
-<br />
-<span id="PleaseWait" name="PleaseWait" style="font-size:12pt; font-weight: Bold; color: Black; visibility: hidden;">Please wait while your request is processed.</span>
-</td>
-</tr>
-</table>
-</td>
-</tr>
+	<tr>
+		<td WIDTH=700>
+			<table BORDER=0>
+				<tr>
+					<td colspan=3>
+						<div ID=header style="font-size:8pt;">Network Printers Connected</div>
+					</td>
+				</tr>
+				<tr>
+					<td align="top">
+						<select id="Printers" name="Printers" multiple="multiple" size="13" style="width: 144px;">
+						</select>
+					</td>
+					<td valign="top">
+						<input id=RemovePrinterbutton class="bigger_button" type="button" value="Remove Printer(s)" style="font-weight:bold;" name="remove_printer_button" onClick="ShowWaitScript('Remove')">
+						<br />
+						<input id=DefaultPrinterbutton class="bigger_button" type="button" value="Set as Default" style="font-weight:bold;" name="set_default_printer_button" onClick="ShowWaitScript('Default')">
+						<br />
+						<input id=TestPrinterbutton class="bigger_button" type="button" value="Test Print" style="font-weight:bold;" name="set_test_printer_button" onClick="ShowWaitScript('TestPrint')">
+						</td>
+						<td valign="Top">
+						<input id=PrinterPropertiesbutton class="bigger_button" type="button" value="Printer Properties" style="font-weight:bold;" name="printer_properties_button" onClick="ShowWaitScript('Properties')">
+						<br /><br />
+						<input id=Aboutbutton class="bigger_button" type="button" value="About" style="font-weight:bold;" name="About_button" onClick="ShowWaitScript('AboutScript')">
+						<br />
+						<br />
+						<span id="PleaseWait" name="PleaseWait" style="font-size:12pt; font-weight: Bold; color: Black; visibility: hidden;">Please wait while your request is processed.</span>
+					</td>
+				</tr>
+			</table>
+		</td>
+	</tr>
 </table>
 <SCRIPT LANGUAGE="VBScript">
-	Dim objShell, objOutput, objExec
-	Set objShell = CreateObject("WScript.Shell")
+Dim objShell, objOutput, objExec
+Set objShell = CreateObject("WScript.Shell")
 </SCRIPT>
 <script type="text/javascript">
-        function zoom() {
-            document.body.style.zoom = "135%";
-        }
+function zoom() {
+	document.body.style.zoom = "135%";
+}
 </script>
 </body>
 </html>

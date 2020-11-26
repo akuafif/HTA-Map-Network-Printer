@@ -2,7 +2,6 @@
 ' A script to create shortcut of the file based on the location of
 ' the map printer folder located
 '---------------------------------------------------------------------------
-
 createLoginFile
 createMapFile
 
