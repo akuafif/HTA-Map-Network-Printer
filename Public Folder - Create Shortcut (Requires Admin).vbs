@@ -48,4 +48,3 @@ Sub createMapFile
 
 	link.Save
 end sub
-

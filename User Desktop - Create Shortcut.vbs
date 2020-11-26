@@ -9,7 +9,7 @@ createMapFile
 ' createLoginFile
 '---------------------------------------------------------------------------
 Sub createLoginFile
-	Dim fso, link, objShell, curDir, DesktopPath
+	Dim fso, link, objShell, DesktopPath
 	
 	Set objShell = CreateObject("WScript.Shell")
 	DesktopPath = objShell.SpecialFolders("Desktop")
@@ -22,8 +22,8 @@ Sub createLoginFile
 		link.IconLocation = fso.GetParentFolderName(Wscript.ScriptFullName) + "\login.ico,0"
 	End If
 
-	link.TargetPath = curDir + "\Login_to_Print_Server.hta"
-	link.WorkingDirectory = curDir
+	link.TargetPath = fso.FileExists(fso.GetParentFolderName(Wscript.ScriptFullName) + "\Login_to_Print_Server.hta"
+	link.WorkingDirectory = fso.FileExists(fso.GetParentFolderName(Wscript.ScriptFullName)
 
 	link.Save
 end sub
@@ -32,7 +32,7 @@ end sub
 ' createMapFile
 '---------------------------------------------------------------------------
 Sub createMapFile
-	Dim fso, link, objShell, curDir, DesktopPath
+	Dim fso, link, objShell, DesktopPath
 	
 	Set objShell = CreateObject("WScript.Shell")
 	DesktopPath = objShell.SpecialFolders("Desktop")
@@ -45,9 +45,8 @@ Sub createMapFile
 		link.IconLocation = fso.GetParentFolderName(Wscript.ScriptFullName) + "\map.ico,0"
 	End If
 
-	link.TargetPath = curDir + "\Map_Printer.hta"
-	link.WorkingDirectory = curDir
+	link.TargetPath = fso.FileExists(fso.GetParentFolderName(Wscript.ScriptFullName) + "\Map_Printer.hta"
+	link.WorkingDirectory = fso.FileExists(fso.GetParentFolderName(Wscript.ScriptFullName) 
 
 	link.Save
 end sub
-
